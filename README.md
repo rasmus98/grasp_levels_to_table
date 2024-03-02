@@ -1,1 +1,2 @@
 # grasp_levels_to_table
+usage: python3 (your path to)/grasp_ls_table -f (your grasp.out) -o (desired nm orbitals in csfs, default 2) -n (num levels out, default all)
