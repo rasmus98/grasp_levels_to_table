@@ -364,7 +364,7 @@ def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,use
     if (user_chosen_num_levels != 0) and (user_chosen_num_levels < num):
         num = user_chosen_num_levels 
 
-    header = 'Index     Energy (Ry)   Parity        J      LS Level Composition'
+    header = 'Index,     Energy (Ry),   Parity,        J,      LS Level Composition'
     print(header)
     for jj in range(0,num):
 
@@ -394,5 +394,5 @@ def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,use
             if kk < len(csf_mixing_coefficients)-1:
                 csf_string +='+ ' 
             
-        output_string = '{:5}  {:14E}     {:8}  {:4}    {}'.format(level,energy,parity,angular_momentum,csf_string)
+        output_string = '{:5},  {:14E},     {:8},  {:4},    {}'.format(level,energy,parity,angular_momentum,csf_string)
         print(output_string)
