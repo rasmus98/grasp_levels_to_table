@@ -7,10 +7,11 @@ LINE_READING_LIMIT = 10**7
 orbitals_order = ['1S', '2S', '2P', '3S', '3P', '4S', '3D', '4P', '4D', '5S', '5P', '6S', '4F', '5D', '6P', '7S', '5F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
 
 class energy_eigenstate:
-    def __init__(self,level,terms_strings,angular_momentum,parity,mixing_indices,mixing_amounts,eigenenergy):
+    def __init__(self,level,terms_strings,angular_momentum,parity,mixing_indices,mixing_amounts,eigenenergy,inner_terms_strings=[]):
         self.mixing_indices = mixing_indices
         self.mixing_amounts = mixing_amounts
         self.terms_strings = terms_strings
+        self.inner_terms_strings = inner_terms_strings
         self.angular_momentum = angular_momentum
         self.parity = parity
         self.eigenenergy = eigenenergy
@@ -121,7 +122,7 @@ def create_csf_array_from_output(grasp_out_path):
     #print('found orbitals')
     #print(orb_labels)
     grasp_out.close()
-    return csf_array,orb_labels,num_nrcsf,num_orbitals 
+    return csf_array,orb_labels,num_nrcsf,num_orbitals,mode 
 
 
 def create_csf_array_from_input(grasp_inp_path):
@@ -295,8 +296,6 @@ def find_relativistic_csfs(grasp_out_path,num_csf):
 def find_levels(grasp_out_path):
     graspout = open(grasp_out_path,'r')
     found = False
-    
-
     while found == False:
         lineunplit = graspout.readline()
         line = lineunplit.split()
@@ -358,7 +357,7 @@ def find_levels(grasp_out_path):
 
     return states
 
-def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,user_chosen_num_levels=0):
+def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,user_chosen_num_levels=0,display_inner_terms=False):
     num = len(eiegenstates_array)
 
     if (user_chosen_num_levels != 0) and (user_chosen_num_levels < num):
@@ -378,6 +377,8 @@ def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,use
         parity = current_state.parity
         angular_momentum = current_state.angular_momentum
 
+        inner_terms = current_state.inner_terms_strings
+
         csf_string = ''
 
         for kk in range(0,len(csf_mixing_coefficients)):
@@ -386,7 +387,10 @@ def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,use
             current_nrcsf_index = rcsfs_map_to_nrcsfs[current_csf_component_index]
             current_nrcsf_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
             
-            this_csf_contribution = '{:6.2f}% ({}) {}'.format(round(100*csf_mixing_coefficients[kk]**2,2),current_nrcsf_string,current_terms[kk])
+            if display_inner_terms:
+                current_nrcsf_string = current_nrcsf_string[0:-4] + '('+inner_terms[kk]+ ') ' + current_nrcsf_string[-4:]
+
+            this_csf_contribution = '{:6.2f}% [{} ({})]'.format(round(100*csf_mixing_coefficients[kk]**2,2),current_nrcsf_string,current_terms[kk])
 
             #print(test)
 
@@ -396,3 +400,77 @@ def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,use
             
         output_string = '{:5},  {:14E},     {:8},  {:4},    {}'.format(level,energy,parity,angular_momentum,csf_string)
         print(output_string)
+
+
+
+
+def find_inner_occupation_terms(graspoutpath,outputmode,num_rcsf):
+    if outputmode < 2:
+        print("output mode is less than 2 - inner term strings cannot be found. continuing.")
+        return []
+    
+    grasp_out = open(graspoutpath,'r')
+
+    found = False 
+    counter = 0
+    
+    while found == False: 
+        counter +=1
+        current_line_read = grasp_out.readline()
+        current_line_split = current_line_read.split()
+        if len(current_line_split) > 6:
+            if current_line_split[-5] =='format':
+                #print(current_line_read)
+                break
+        if not current_line_read:
+            print('failure in locating inner terms')
+            print('ran off end of file. your GRASP.OUT probably doesnt contain the string (CSFs are defined using format) which is what im looking for')
+            print('stopping')
+            sys.exit()
+    
+    for jj in range(0,3):
+        current_line_read = grasp_out.readline()
+    
+    inner_term_string_array = []
+    
+
+    for kk in range(0,num_rcsf):
+        #print(kk)
+        inner_term_string = ''
+        for ii in range(0,6):
+            current_line_read = grasp_out.readline()
+            #print(current_line_read)
+            split = current_line_read.split()
+            length = len(split)
+            #print(length)
+            if ii == 2:
+                if length < 4: #only one thing outside a closed shell. therefore the closed shell is 1S
+                    inner_term_string = inner_term_string + '1'
+                else:
+                    inner_term_string = inner_term_string + split[-4]
+            if ii ==3:
+                if length < 5: #only one thing outside a closed shell. therefore the closed shell is 1S
+                    inner_term_string = inner_term_string + 'S'
+                else:
+                    inner_term_string = inner_term_string + split[-5]
+        inner_term_string_array.append(inner_term_string)
+
+    return inner_term_string_array
+
+def add_inner_occupation_strings_to_eigenclass(graspoutpath,outputmode,energy_eigenstate_list):
+
+    num_rcsf = len(energy_eigenstate_list)
+
+    inner_term_string_array = find_inner_occupation_terms(graspoutpath,outputmode,num_rcsf)
+
+    for kk in range(0,len(energy_eigenstate_list)):
+        inner_term_list = []
+        for index in energy_eigenstate_list[kk].mixing_indices:
+            inner_term_list.append(inner_term_string_array[index])
+
+        energy_eigenstate_list[kk].inner_terms_strings = inner_term_list 
+
+    #state = energy_eigenstate_list[0]
+    #print(state.inner_terms_strings)
+
+    return energy_eigenstate_list
