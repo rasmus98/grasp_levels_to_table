@@ -357,6 +357,18 @@ def find_levels(grasp_out_path):
 
     return states
 
+
+def find_place_for_inner_term(csf_string):
+    for kk in range(len(csf_string)-1,-1,-1):
+        if csf_string[kk] != ' ':
+            break 
+    
+    for ii in range(kk,-1,-1):
+        if csf_string[ii] == ' ':
+            break 
+
+    return ii    
+
 def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,user_chosen_num_levels=0,display_inner_terms=False):
     num = len(eiegenstates_array)
 
@@ -388,7 +400,9 @@ def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,use
             current_nrcsf_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
             
             if display_inner_terms:
-                current_nrcsf_string = current_nrcsf_string[0:-4] + '('+inner_terms[kk]+ ') ' + current_nrcsf_string[-4:]
+                index = find_place_for_inner_term(current_nrcsf_string)
+
+                current_nrcsf_string = current_nrcsf_string[0:index] + '('+inner_terms[kk]+ ') ' + current_nrcsf_string[index:]
 
             this_csf_contribution = '{:6.2f}% [{} ({})]'.format(round(100*csf_mixing_coefficients[kk]**2,2),current_nrcsf_string,current_terms[kk])
 
