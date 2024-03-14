@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--file',  help='Specify path of GRASP.OUT')
 parser.add_argument('-n', '--num',  help='Requested number of states (all states by default)',type=int)
 parser.add_argument('-o', '--num_orbitals',  help='number of orbitals to show in NRCSF (2 default)',type=int)
-parser.add_argument('-i', '--inner_terms',  help='number of orbitals to show in NRCSF (2 default)',action='store_true')
+parser.add_argument('-i', '--inner_terms',  help='show inner terms',action='store_true')
 
 args = parser.parse_args()
 
