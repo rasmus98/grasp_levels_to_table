@@ -105,7 +105,48 @@ def read_terms_and_output(terms,csf_strings,num_levels):
 
     return 0
 
+def read_levels_and_output(levels,csf_strings,num_levels):
 
+    terms_data = np.loadtxt(levels,skiprows=1) 
+    #print(np.shape(terms_data))
+    if num_levels > np.shape(terms_data)[0]:
+        num_levels = np.shape(terms_data)[0]
+
+
+            
+    output_string = '{:5},   {:12.8f},     {}  {}'
+
+
+    #print(num_levels)
+
+    header = 'Index       Energy(Ry)     CSF(TERM)        J'
+    print(header)
+    for kk in range(0,num_levels-1):
+        line = terms_data[kk]
+
+        j = int(line[0]) / 2
+        parity = line[1]
+
+        multiplicity = abs(line[2])
+        angular = line[3]
+        cf_number = int(line[4]-1)
+        energy_ryd = line[-1]
+
+        term_string = '('+str(int(multiplicity)) + translate_angular(int(angular))
+
+        if int(parity) == 0: 
+            term_string += ' '
+        elif int(parity) == 1:
+            term_string += '*'
+        else:
+            print('failure in parity idenficiation at level',kk+1,'parity found',parity)
+
+        term_string += ')'
+        print(output_string.format(kk+1,energy_ryd,csf_strings[cf_number] + term_string.upper(),j))
+
+
+
+    return 0
 
 def translate_angular(angular_number):
     if angular_number < 7:
