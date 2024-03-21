@@ -17,12 +17,12 @@ def main(grasp_out_path,num_orbitals_shown,user_num_levels,display_inner_terms):
     csf_strings_prepared = make_csf_strings(num_orbitals_shown,csf_sorted_by_orbital,sorted_orbital_array,num_nrcsf)
 
     map = find_relativistic_csfs(grasp_out_path,num_nrcsf)
-    states = find_levels(grasp_out_path)
+    states = find_levels(grasp_out_path,display_inner_terms,csf_strings_prepared,map)
     
-    if display_inner_terms:
-        states = add_inner_occupation_strings_to_eigenclass(grasp_out_path,mode,states)
+    #if display_inner_terms:
+    #    states = add_inner_occupation_strings_to_eigenclass(grasp_out_path,mode,states)
 
-    output_table(csf_strings_prepared,map,states,user_num_levels,display_inner_terms)
+    output_table(states,user_num_levels)
 
     return 0
 
