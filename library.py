@@ -2,20 +2,173 @@ import numpy as np
 import sys
 
 LINE_READING_LIMIT = 10**7
-
+RYDBERG_CM = 109737.316 
 #preferred orbital order. you might need to change this for your preferred application.
 orbitals_order = ['1S', '2S', '2P', '3S', '3P', '4S', '3D', '4P', '4D', '5S', '5P', '6S', '4F', '5D', '6P', '7S', '5F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
 
 class energy_eigenstate:
-    def __init__(self,level,terms_strings,angular_momentum,parity,mixing_indices,mixing_amounts,eigenenergy,inner_terms_strings=[]):
+
+    def make_total_string(self,display_inner_terms,csf_strings_prepared,rcsfs_map_to_nrcsfs):
+
+        csf_mixing_coefficients = self.mixing_amounts
+        csf_mixing_states = self.mixing_indices
+        current_terms = self.terms_strings
+        #print(current_state.eigenenergy)
+        csf_string =''
+        inner_terms = self.inner_terms_strings
+        for kk in range(0,len(csf_mixing_coefficients)):
+            current_csf_component_index = csf_mixing_states[kk]
+
+            current_nrcsf_index = rcsfs_map_to_nrcsfs[current_csf_component_index]
+            current_nrcsf_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
+            
+            if display_inner_terms:
+                index = find_place_for_inner_term(current_nrcsf_string)
+
+                current_nrcsf_string = current_nrcsf_string[0:index] + '('+inner_terms[kk]+ ') ' + current_nrcsf_string[index:]
+
+            this_csf_contribution = '{:6.2f}% [{} ({})]'.format(round(100*csf_mixing_coefficients[kk]**2,2),current_nrcsf_string,current_terms[kk])
+
+            csf_string += this_csf_contribution+' '
+            if kk < len(csf_mixing_coefficients)-1:
+                csf_string +='+ ' 
+            self.csf_string = csf_string 
+    
+    def make_leading_term_string(self,csf_strings_prepared,rcsfs_map_to_nrcsfs):
+        
+
+        current_csf_component_index = self.mixing_indices[0]
+        current_nrcsf_index = rcsfs_map_to_nrcsfs[current_csf_component_index]
+
+
+        leading_term_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
+        leading_term_string += '('+self.terms_strings[0]
+
+        if self.parity == 'odd':
+            leading_term_string += '*)' 
+        else:
+            leading_term_string += ' )' 
+        leading_term_string += '_{'+self.angular_momentum+'}'
+        self.leading_term_string = leading_term_string
+
+
+
+    def __init__(self,level,terms_strings,angular_momentum,parity,mixing_indices,mixing_amounts,eigenenergy,csf_strings_prepared,rcsfs_map_to_nrcsfs,display_inner_terms,inner_terms_strings=[]):
         self.mixing_indices = mixing_indices
         self.mixing_amounts = mixing_amounts
         self.terms_strings = terms_strings
         self.inner_terms_strings = inner_terms_strings
         self.angular_momentum = angular_momentum
+
+        if angular_momentum[-2] == "/":
+            self.angular_momentum_float = float(angular_momentum[0]) / float(angular_momentum[-1])
+        else:
+            self.angular_momentum_float = float(angular_momentum)
+
+
         self.parity = parity
         self.eigenenergy = eigenenergy
         self.level = level
+        self.wavenumber = eigenenergy * RYDBERG_CM
+        if eigenenergy<0:
+            self.wavenumber = 0.0
+
+        self.shifted_energy_ryd = -1.0
+        self.shifted_energy_cm= -1.0
+
+        self.make_total_string(display_inner_terms,csf_strings_prepared,rcsfs_map_to_nrcsfs)
+        self.make_leading_term_string(csf_strings_prepared,rcsfs_map_to_nrcsfs)
+
+    def set_shifted_energy(self,shifted_energy_ryd):
+        self.shifted_energy_ryd = shifted_energy_ryd
+        self.shifted_energy_cm = shifted_energy_ryd * RYDBERG_CM
+
+
+class raw_grasp_data:
+    def __init__(self,grasp_line,electric):
+        
+        self.lower_index_unshifted = min(int(grasp_line[0]),int(grasp_line[1]))
+        self.upper_index_unshifted = max(int(grasp_line[0]),int(grasp_line[1]))
+        self.wavelength_nm_vac = float(grasp_line[2]) / 10.0
+        self.a_ji = float(grasp_line[3])
+        self.f_ij = float(grasp_line[4])
+        self.lstrength = float(grasp_line[5])
+
+        if electric:
+            self.vel_len = float(grasp_line[6])
+        else:
+            self.vel_len = -np.inf
+
+class transition:
+    def __init__(self,eigenstates:list[energy_eigenstate],raw_grasp_data_class: raw_grasp_data,lower_energy_ryd_shifted = -1.0,upper_energy_ryd_shifted = -1.0):
+        
+        self.lower_index_unshifted = raw_grasp_data_class.lower_index_unshifted
+        self.upper_index_unshifted = raw_grasp_data_class.upper_index_unshifted
+        self.wavelength_nm_vac = raw_grasp_data_class.wavelength_nm_vac
+        self.wavelength_ang_vac = raw_grasp_data_class.wavelength_nm_vac * 10.0
+        self.wavelength_ang_air = vac_to_air(self.wavelength_ang_vac)
+        self.wavelength_nm_air = 0.1 * self.wavelength_ang_air
+
+        
+
+        self.lower_eigenstate = eigenstates[raw_grasp_data_class.lower_index_unshifted - 1]
+        self.upper_eigenstate = eigenstates[raw_grasp_data_class.upper_index_unshifted - 1]
+
+        self.upper_weight = 2.0 * self.upper_eigenstate.angular_momentum_float + 1.0
+        self.lower_weight = 2.0 * self.lower_eigenstate.angular_momentum_float + 1.0
+
+        self.upper_ang = self.upper_eigenstate.angular_momentum_float
+        self.lower_ang = self.lower_eigenstate.angular_momentum_float
+
+        self.avalue = raw_grasp_data_class.a_ji
+        self.f = raw_grasp_data_class.f_ij
+
+        self.gavalue = self.avalue * self.upper_weight
+        self.gf = self.f * self.lower_weight
+        self.loggf = np.log10(self.gf)
+        self.s = raw_grasp_data_class.lstrength
+        self.vel_len = raw_grasp_data_class.vel_len
+        self.energy_lower_shifted_ryd = lower_energy_ryd_shifted
+        self.energy_upper_shifted_ryd = upper_energy_ryd_shifted
+
+        self.energy_lower_shifted_wn = lower_energy_ryd_shifted * RYDBERG_CM
+        self.energy_upper_shifted_wn = upper_energy_ryd_shifted * RYDBERG_CM
+
+    def display_transition(self):
+        string = '{:5} {:5} {:14.4F}  {:3.1F}   {:14.4F}  {:3.1F}    {:14.4F}    {:14.4F}  {:10.2E} {:10.2E}    {:10.2E}  {:10.2E}  {:10.4f} {:10.4f}    {}    {}'
+        
+        if (self.lower_eigenstate.shifted_energy_cm != -1.0) and (self.upper_eigenstate.shifted_energy_cm != -1.0):
+            lower_energy = self.lower_eigenstate.shifted_energy_cm
+            upper_energy = self.upper_eigenstate.shifted_energy_cm
+        else:
+            lower_energy = self.lower_eigenstate.wavenumber
+            upper_energy = self.upper_eigenstate.wavenumber           
+        
+        print(string.format(self.lower_index_unshifted,\
+                            self.upper_index_unshifted,\
+                            lower_energy,\
+                            self.lower_ang,\
+                            upper_energy,\
+                            self.upper_ang,\
+                            self.wavelength_nm_vac,\
+                            self.wavelength_nm_air,\
+                            self.avalue,\
+                            self.gavalue,\
+                            self.f,\
+                            self.gf,\
+                            self.loggf,\
+                            self.vel_len,\
+                            self.lower_eigenstate.leading_term_string,\
+                            self.upper_eigenstate.leading_term_string))
+
+def vac_to_air(wl_ang_vac):
+    if (wl_ang_vac > 2000.0 and wl_ang_vac < 100000.0):
+        wl_ang_vac_sq = wl_ang_vac * wl_ang_vac
+        n =  1.0 + 0.0000834254 + 0.02406147 / (130.0 - wl_ang_vac_sq) + 0.00015998  / (38.9 - wl_ang_vac_sq)
+        return wl_ang_vac / n
+    else:
+        return wl_ang_vac
+
 
 def check_for_condensed_notation_in_row(occupation_string_array):
 
@@ -293,7 +446,7 @@ def find_relativistic_csfs(grasp_out_path,num_csf):
     graspout.close()
     return rcsfs_map_to_nrcsfs
 
-def find_levels(grasp_out_path):
+def find_levels(grasp_out_path,inner,csf_strings_prepared,rcsfs_map_to_nrcsfs):
     graspout = open(grasp_out_path,'r')
     found = False
     while found == False:
@@ -333,7 +486,7 @@ def find_levels(grasp_out_path):
                 if in_a_state == True:
                     #we are now in a new eigenstate, so save the previous one:
                     #print(current_length)
-                    state = energy_eigenstate(level,term_strings,angularmomentum,parity,csf_index,mixing,eigenergy)
+                    state = energy_eigenstate(level,term_strings,angularmomentum,parity,csf_index,mixing,eigenergy,csf_strings_prepared,rcsfs_map_to_nrcsfs,inner)
                     states.append(state)
                 
                 in_a_state = True
@@ -352,7 +505,7 @@ def find_levels(grasp_out_path):
                 csf_index.append(int(line[4])-1)
                 mixing.append(float(line[5]))
                 #print(line)
-    state = energy_eigenstate(level,term_strings,angularmomentum,parity,csf_index,mixing,eigenergy)
+    state = energy_eigenstate(level,term_strings,angularmomentum,parity,csf_index,mixing,eigenergy,csf_strings_prepared,rcsfs_map_to_nrcsfs,inner)
     states.append(state)
 
     return states
@@ -369,7 +522,8 @@ def find_place_for_inner_term(csf_string):
 
     return ii    
 
-def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,user_chosen_num_levels=0,display_inner_terms=False):
+
+def output_table(eiegenstates_array,user_chosen_num_levels=0):
     num = len(eiegenstates_array)
 
     if (user_chosen_num_levels != 0) and (user_chosen_num_levels < num):
@@ -381,36 +535,11 @@ def output_table(csf_strings_prepared,rcsfs_map_to_nrcsfs,eiegenstates_array,use
 
         current_state = eiegenstates_array[jj]
         energy = current_state.eigenenergy
-        csf_mixing_coefficients = current_state.mixing_amounts
-        csf_mixing_states = current_state.mixing_indices
-        current_terms = current_state.terms_strings
-        #print(current_state.eigenenergy)
+
         level = current_state.level
         parity = current_state.parity
         angular_momentum = current_state.angular_momentum
-
-        inner_terms = current_state.inner_terms_strings
-
-        csf_string = ''
-
-        for kk in range(0,len(csf_mixing_coefficients)):
-            current_csf_component_index = csf_mixing_states[kk]
-
-            current_nrcsf_index = rcsfs_map_to_nrcsfs[current_csf_component_index]
-            current_nrcsf_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
-            
-            if display_inner_terms:
-                index = find_place_for_inner_term(current_nrcsf_string)
-
-                current_nrcsf_string = current_nrcsf_string[0:index] + '('+inner_terms[kk]+ ') ' + current_nrcsf_string[index:]
-
-            this_csf_contribution = '{:6.2f}% [{} ({})]'.format(round(100*csf_mixing_coefficients[kk]**2,2),current_nrcsf_string,current_terms[kk])
-
-            #print(test)
-
-            csf_string += this_csf_contribution+' '
-            if kk < len(csf_mixing_coefficients)-1:
-                csf_string +='+ ' 
+        csf_string = current_state.csf_string
             
         output_string = '{:5},  {:14E},     {:8},  {:4},    {}'.format(level,energy,parity,angular_momentum,csf_string)
         print(output_string)
@@ -488,3 +617,154 @@ def add_inner_occupation_strings_to_eigenclass(graspoutpath,outputmode,energy_ei
     #print(state.inner_terms_strings)
 
     return energy_eigenstate_list
+
+
+def find_transition_probabilities(grasp_out_path):
+    
+    graspout = open(grasp_out_path,'r')
+    found = False
+    while (found == False):
+        x = graspout.readline()
+        split = x.split()
+
+        if len(split) > 0:
+            if split[0] =='Electric':
+                #print('yes')
+                #print(split)
+                found = True
+        if not x:
+            print('ran off end of file. your GRASP.OUT probably doesnt contain the string (Electric ... emission transition probability (sec-1) ... length) which is what im looking for')
+            print('stopping')
+            sys.exit()
+
+    for jj in range(0,11):
+        graspout.readline()
+
+    electric_data = []
+    x = graspout.readline()
+    split = x.split()
+
+    while len(split) != 0:
+        raw_grasp_transition = raw_grasp_data(split,True)
+        electric_data.append(raw_grasp_transition)
+        x = graspout.readline()
+        split = x.split()
+
+
+
+
+    found = False
+    while (found == False):
+        x = graspout.readline()
+        split = x.split()
+
+        if len(split) > 0:
+            if split[0] =='Magnetic':
+                #print('yes')
+                #print(split)
+                found = True
+        if not x:
+            print('ran off end of file. your GRASP.OUT probably doesnt contain the string (Magnetic ) which is what im looking for')
+            print('stopping')
+            sys.exit()
+
+    for jj in range(0,11):
+        graspout.readline()
+
+    magnetic_data = []
+    x = graspout.readline()
+    split = x.split()
+
+    while len(split) != 0:
+        raw_grasp_transition = raw_grasp_data(split,False)
+        magnetic_data.append(raw_grasp_transition)
+        x = graspout.readline()
+        split = x.split()
+
+    #print(magnetic_data[-1].lstrength)
+    graspout.close()
+
+
+    total_data = electric_data.copy()
+
+    total_data.extend(magnetic_data)
+    
+    #print(electric_data)
+
+    return total_data
+
+def find_shifted_energies(grasp_out_path):
+    
+    graspout = open(grasp_out_path,'r')
+    found = False
+    while (found == False):
+        x = graspout.readline()
+        split = x.split()
+
+        if len(split) > 0:
+            if split[0] =='OSCL':
+                #print('yes')
+                #print(split)
+                found = True
+        if not x:
+            print('ran off end of file. your GRASP.OUT probably doesnt contain the string (OSCL ... emission transition probability (sec-1) ... length) which is what im looking for')
+            print('stopping')
+            sys.exit()
+
+    if '17' not in split: #then there is no shifting
+        return []
+    else:
+        shifted_energies = []
+        x = graspout.readline()
+        x = x.replace(':',' ')
+        split = x.split()
+        num = int(split[-1])
+        for jj in range(0,num):
+            x = graspout.readline()
+            x = x.replace('c',' ')
+            shifted_energies.append(float(x))
+
+        shifted_energies_ryd = np.array(shifted_energies)
+
+        return shifted_energies_ryd
+
+def add_shifted_energies_to_many_eigenstates(eigenstates:list[energy_eigenstate],shifted_energies_ryd):
+    counter = 0
+    for state in eigenstates:
+            state.set_shifted_energy(shifted_energies_ryd[counter])
+            counter +=1 
+            if counter > len(shifted_energies_ryd)-1:
+                break
+
+    return eigenstates
+
+def convert_raw_data_to_transition_class(total_data:list[raw_grasp_data],eigenstates:list[energy_eigenstate]):
+
+    total_data_class = []
+
+    for transition_raw in total_data:
+        total_data_class.append( transition(eigenstates,transition_raw) )
+    
+    return total_data_class 
+
+def print_out_a_values(total_data_class_array:list[transition]):
+    
+    
+    #string = '{:5} {:5} {:14.4F}  {:3.1F}   {:14.4F}  {:3.1F}    {:14.4F}  {:10.2E} {:10.2E}    {:10.2E}  {:10.2E}  {:10.2E}    {}    {}'
+
+    header = '{:5} {:5}   {:14} {:3}    {:14} {:3}   {:>14s}    {:>14s}  {:>10s} {:>10s}     {:>10s} {:>10s}  {:>10s} {:>10s}   {:>20s}  {:>20s}'
+    print(header.format(
+            'Lower','Upper'
+            ,'Lower (cm-1)','JL'
+            ,'Upper (cm-1)','JU'
+            ,'λ (vac,nm)'
+            ,'λ (air,nm)'
+            ,'A (s-1)','gA (s-1)'
+            ,'f ','gf','log(gf)'
+            ,'vel\len'
+            ,'LowDesignation','UppDesignation'
+    ))
+    for trans in total_data_class_array:
+        trans.display_transition()
+
+    return 0
