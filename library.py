@@ -22,7 +22,7 @@ class energy_eigenstate:
             current_nrcsf_index = rcsfs_map_to_nrcsfs[current_csf_component_index]
             current_nrcsf_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
             
-            if display_inner_terms:
+            if display_inner_terms and len(inner_terms) >0:
                 index = find_place_for_inner_term(current_nrcsf_string)
 
                 current_nrcsf_string = current_nrcsf_string[0:index] + '('+inner_terms[kk]+ ') ' + current_nrcsf_string[index:]
@@ -60,10 +60,12 @@ class energy_eigenstate:
         self.inner_terms_strings = inner_terms_strings
         self.angular_momentum = angular_momentum
 
-        if angular_momentum[-2] == "/":
-            self.angular_momentum_float = float(angular_momentum[0]) / float(angular_momentum[-1])
-        else:
-            self.angular_momentum_float = float(angular_momentum)
+        if len(angular_momentum) > 2:
+
+            if angular_momentum[-2] == "/":
+                self.angular_momentum_float = float(angular_momentum[0]) / float(angular_momentum[-1])
+            else:
+                self.angular_momentum_float = float(angular_momentum)
 
 
         self.parity = parity
@@ -102,17 +104,24 @@ class raw_grasp_data:
 class transition:
     def __init__(self,eigenstates:list[energy_eigenstate],raw_grasp_data_class: raw_grasp_data,lower_energy_ryd_shifted = -1.0,upper_energy_ryd_shifted = -1.0):
         
+        #i hate - myself
+
         self.lower_index_unshifted = raw_grasp_data_class.lower_index_unshifted
         self.upper_index_unshifted = raw_grasp_data_class.upper_index_unshifted
-        self.wavelength_nm_vac = raw_grasp_data_class.wavelength_nm_vac
-        self.wavelength_ang_vac = raw_grasp_data_class.wavelength_nm_vac * 10.0
+        
+        self.lower_eigenstate = eigenstates[raw_grasp_data_class.lower_index_unshifted - 1]
+        self.upper_eigenstate = eigenstates[raw_grasp_data_class.upper_index_unshifted - 1]
+
+        if (self.lower_eigenstate.shifted_energy_cm == -1.0) or (self.upper_eigenstate.shifted_energy_cm == -1.0):
+            self.wavelength_nm_vac = raw_grasp_data_class.wavelength_nm_vac
+        else:
+            self.wavelength_nm_vac = 1e7 / np.abs (self.lower_eigenstate.shifted_energy_cm - self.upper_eigenstate.shifted_energy_cm )
+        
+        self.wavelength_ang_vac = self.wavelength_nm_vac * 10.0
         self.wavelength_ang_air = vac_to_air(self.wavelength_ang_vac)
         self.wavelength_nm_air = 0.1 * self.wavelength_ang_air
 
-        
 
-        self.lower_eigenstate = eigenstates[raw_grasp_data_class.lower_index_unshifted - 1]
-        self.upper_eigenstate = eigenstates[raw_grasp_data_class.upper_index_unshifted - 1]
 
         self.upper_weight = 2.0 * self.upper_eigenstate.angular_momentum_float + 1.0
         self.lower_weight = 2.0 * self.lower_eigenstate.angular_momentum_float + 1.0
@@ -162,16 +171,23 @@ class transition:
                             self.upper_eigenstate.leading_term_string))
 
 def vac_to_air(wl_ang_vac):
+
+    #converts a vaccumm wl (ang) to air. there are supposedly many conversion.
+    #the commented one is from vald, the other is from https://www.sdss3.org/dr8/spectro/spectra.php
+    
+    #they give identical results as far as I can see. The other one might be cheaper tbf.
+
     if (wl_ang_vac > 2000.0 and wl_ang_vac < 100000.0):
-        wl_ang_vac_sq = wl_ang_vac * wl_ang_vac
-        n =  1.0 + 0.0000834254 + 0.02406147 / (130.0 - wl_ang_vac_sq) + 0.00015998  / (38.9 - wl_ang_vac_sq)
+        ssq = 1e8 / (wl_ang_vac * wl_ang_vac)
+        #n =  1.0 + 0.0000834254 + 0.02406147 / (130.0 - ssq) + 0.00015998  / (38.9 - ssq)
+        n = 1.0 + 2.735182E-4 + 131.4182 / wl_ang_vac**2 + 2.76249E8 / wl_ang_vac**4
         return wl_ang_vac / n
     else:
         return wl_ang_vac
 
 
-def check_for_condensed_notation_in_row(occupation_string_array):
-
+def check_for_condensed_notation_in_row(occupation_string_array):   
+    #checks for condensed notatation in grasp input
     for occupation_string in occupation_string_array:
         x = occupation_string.find('*')
         if x != -1:
@@ -180,6 +196,7 @@ def check_for_condensed_notation_in_row(occupation_string_array):
     return False
 
 def decode_condensed_notation(occupation_string_array,num_csfs):
+    #decodes grasp inp condensed notation
     array = np.zeros(num_csfs)
 
     offset = 0
@@ -200,6 +217,9 @@ def decode_condensed_notation(occupation_string_array,num_csfs):
     return array 
 
 def create_csf_array_from_output(grasp_out_path):
+    
+    #makes an np array of input csf occupations from grasp out
+
     grasp_out = open(grasp_out_path,'r')
     found = False
     while found == False:
@@ -279,6 +299,7 @@ def create_csf_array_from_output(grasp_out_path):
 
 
 def create_csf_array_from_input(grasp_inp_path):
+    #    #makes an np array of input csf occupations from grasp inp - retired
 
     grasp_inp = open(grasp_inp_path,'r')
     grasp_inp_read = grasp_inp.readlines()
@@ -349,7 +370,7 @@ def sort_orbitals(orb_labels,orbitals_order,csf_array):
     return sorted_orbital_array,csf_sorted_by_orbital
 
 def make_csf_strings(num_orbitals_to_be_shown,csf_array_resorted_orbitals,sorted_orbital_strings,num_csfs):
-    
+    #makes strings out of the input csfs.
     num_orbitals_to_be_shown = min(num_orbitals_to_be_shown,len(sorted_orbital_strings))
 
     csf_strings_in_components = []
@@ -400,7 +421,7 @@ def make_csf_strings(num_orbitals_to_be_shown,csf_array_resorted_orbitals,sorted
     return csf_strings
 
 def find_relativistic_csfs(grasp_out_path,num_csf):
-    
+    #reads graspout and finds relativistic csfs indicies.
     graspout = open(grasp_out_path,'r')
 
     num_rcsfs_per_csf = np.zeros(num_csf)
@@ -444,7 +465,7 @@ def find_relativistic_csfs(grasp_out_path,num_csf):
         offset = offset+int(num_rcsfs_per_csf[kk])
 
     graspout.close()
-    return rcsfs_map_to_nrcsfs
+    return rcsfs_map_to_nrcsfs,num_rcsf_total
 
 def find_levels(grasp_out_path,inner,csf_strings_prepared,rcsfs_map_to_nrcsfs):
     graspout = open(grasp_out_path,'r')
@@ -561,8 +582,8 @@ def find_inner_occupation_terms(graspoutpath,outputmode,num_rcsf):
         counter +=1
         current_line_read = grasp_out.readline()
         current_line_split = current_line_read.split()
-        if len(current_line_split) > 6:
-            if current_line_split[-5] =='format':
+        if len(current_line_split) > 2:
+            if current_line_split[1] =='NROUT:':
                 #print(current_line_read)
                 break
         if not current_line_read:
@@ -570,9 +591,14 @@ def find_inner_occupation_terms(graspoutpath,outputmode,num_rcsf):
             print('ran off end of file. your GRASP.OUT probably doesnt contain the string (CSFs are defined using format) which is what im looking for')
             print('stopping')
             sys.exit()
-    
+    found = False
+    while found == False:
+        current_line_read = grasp_out.readline().split()
+        if len(current_line_read) > 0:
+            if current_line_read[0] == 'CSFs':
+                found = True
     for jj in range(0,3):
-        current_line_read = grasp_out.readline()
+        grasp_out.readline()
     
     inner_term_string_array = []
     
@@ -582,6 +608,7 @@ def find_inner_occupation_terms(graspoutpath,outputmode,num_rcsf):
         inner_term_string = ''
         for ii in range(0,6):
             current_line_read = grasp_out.readline()
+            #print(current_line_read)
             #print(current_line_read)
             split = current_line_read.split()
             length = len(split)
@@ -600,7 +627,7 @@ def find_inner_occupation_terms(graspoutpath,outputmode,num_rcsf):
 
     return inner_term_string_array
 
-def add_inner_occupation_strings_to_eigenclass(graspoutpath,outputmode,energy_eigenstate_list):
+def add_inner_occupation_strings_to_eigenclass(graspoutpath,outputmode,energy_eigenstate_list,display_inner_terms,csf_strings_prepared,map):
 
     num_rcsf = len(energy_eigenstate_list)
 
@@ -612,9 +639,11 @@ def add_inner_occupation_strings_to_eigenclass(graspoutpath,outputmode,energy_ei
             inner_term_list.append(inner_term_string_array[index])
 
         energy_eigenstate_list[kk].inner_terms_strings = inner_term_list 
+        energy_eigenstate_list[kk].make_total_string(display_inner_terms,csf_strings_prepared,map)
 
     #state = energy_eigenstate_list[0]
     #print(state.inner_terms_strings)
+
 
     return energy_eigenstate_list
 
@@ -752,9 +781,9 @@ def print_out_a_values(total_data_class_array:list[transition]):
     
     #string = '{:5} {:5} {:14.4F}  {:3.1F}   {:14.4F}  {:3.1F}    {:14.4F}  {:10.2E} {:10.2E}    {:10.2E}  {:10.2E}  {:10.2E}    {}    {}'
 
-    header = '{:5} {:5}   {:14} {:3}    {:14} {:3}   {:>14s}    {:>14s}  {:>10s} {:>10s}     {:>10s} {:>10s}  {:>10s} {:>10s}   {:>20s}  {:>20s}'
+    header = '#{:>4s} {:>5s}   {:14} {:3}    {:14} {:3}   {:>14s}    {:>14s}  {:>10s} {:>10s}     {:>10s} {:>10s}  {:>10s} {:>10s}   {:>20s}  {:>20s}'
     print(header.format(
-            'Lower','Upper'
+            'Low','Upp'
             ,'Lower (cm-1)','JL'
             ,'Upper (cm-1)','JU'
             ,'λ (vac,nm)'
