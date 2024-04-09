@@ -17,17 +17,114 @@ class eigenstate:
         self.mixing_indices = []
             
 
-    def make_csf_string(self,num_states_to_be_shown):
+    def make_csf_string(self,num_states_to_be_shown,jj_terms,map,csf_prepared_nr,percent=True,debug=False):
         ind,coef = isolate_most_contributing_csfs_from_eigenvector(self.eigenvector,num_states_to_be_shown)
         self.mixing_coefficients = coef 
         self.mixing_indices = ind
         string = ''
+
         for jj in range(0,len(ind)):
             if abs(coef[jj]) > EIGENVECTOR_CUT_OFF:
-                string+= str(round(coef[jj],3))+'*' + str(ind[jj]) +' '
+                nr_csf_string_index = map[ind[jj]]
+                csf_string = csf_prepared_nr[int(nr_csf_string_index)]
+                if debug:
+                    csf_string += '(debug csf index: '+str(ind[jj]+1)+')'
+                coefficient = round(coef[jj],3)
+
+                if percent:
+                    coefficient_string = str(round(100 * coefficient**2,2))+'% '
+                else:
+                    coefficient_string = str(coefficient)
+                
+                string+= coefficient_string +  csf_string +' ' + jj_terms[ind[jj]]+ '  '
         self.label_string = string
 
         
+def locate_cfout_jj(graspoutpath):
+    grasp_out_read = open(graspoutpath,'r').readlines()
+    found = False 
+    counter = 0
+    
+    while found == False: 
+        counter +=1
+        current_line_read = grasp_out_read[counter]
+        current_line_split = current_line_read.split()
+        if len(current_line_split) > 2:
+            if current_line_split[1] =='CFOUT:':
+                #print(current_line_read)
+                break
+        if not current_line_read:
+            print('failure in locating inner terms')
+            print('ran off end of file. your GRASP.OUT probably doesnt contain the string (CSFs are defined using format) which is what im looking for')
+            print('stopping')
+            sys.exit()
+        
+    found = False
+    while found == False:
+        counter+=1
+        current_line_read = grasp_out_read[counter].split()
+        if len(current_line_read) > 0:
+            if current_line_read[0] == 'CSFs':
+                found = True
+    #for jj in range(0,20):
+    #    print(grasp_out_read[jj+counter])
+    return counter
+
+def read_cfout_jj(graspoutpath,position,num_rcsf):
+    
+    #collects the jj terms. might need revisited if the csfs extend to a second line
+    line_break_asterisk='***********************************************************************'
+    grasp_out_read = open(graspoutpath,'r').readlines() 
+    jj_terms_csfs = []
+    pos = position + 4
+
+    count = 0 
+    while count < num_rcsf:
+        for kk in range(1,20):
+             current_line = grasp_out_read[pos+kk]
+             if len(current_line.split()) > 0:
+                 if current_line.split()[0] == 'CSF' or current_line.split()[0] == line_break_asterisk:
+                     print(kk)
+                     break
+        length_of_csf = kk 
+        num_lines = int(length_of_csf/4)
+        string = ''
+        for jj in range(0,num_lines):
+            print((grasp_out_read[pos+(jj+1)*4 ]))
+            string += (grasp_out_read[pos+(jj+1)*4 ].replace('\n',''))
+        #print('yes',string)
+        jj_terms_csfs.append(string)
+
+        count+=1
+
+        pos = pos+length_of_csf
+
+
+    
+
+    #for jj in range(0,num_rcsf):
+    #    pos = pos + 6
+    #    string = grasp_out_read[pos]
+    #    jj_terms_csfs.append(string.replace('\n',''))
+
+    return jj_terms_csfs
+
+
+def decode_jj_terms(jj_term_csfs_array):
+    jj_terms_final = []
+    for jj_terms in jj_term_csfs_array:
+        split = jj_terms.split()
+        #print(split)
+        if len(split) < 5:
+            print('failure in ',jj_terms)
+            sys.exit()
+        j1 = split[-4].replace(';','').replace(')','')
+        j2 = split[-2].replace(';','').replace(')','')
+        #print(j1,j2)
+        string = '(' +str(j1)+','+str(j2)+')'
+        jj_terms_final.append(string)
+
+    return jj_terms_final
 
 
 def locate_eigenvectors(graspoutpath):
@@ -166,9 +263,9 @@ def produce_eigenstate_array(level_data,eigenvectors) -> list[eigenstate]:
     
     return eigenstate_array 
 
-def make_many_eigenstate_strings(eigenstate_array:list[eigenstate],num_to_be_shown) -> list[eigenstate]:
+def make_many_eigenstate_strings(eigenstate_array:list[eigenstate],num_to_be_shown,jj_terms,map,csf_prepared) -> list[eigenstate]:
     for state in eigenstate_array:
-        state.make_csf_string(num_to_be_shown)
+        state.make_csf_string(num_to_be_shown,jj_terms,map,csf_prepared)
     return eigenstate_array
 
 def output_table(eiegenstates_array:list[eigenstate],user_chosen_num_levels=0):
