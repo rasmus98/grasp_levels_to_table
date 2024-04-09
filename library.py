@@ -4,7 +4,7 @@ import sys
 LINE_READING_LIMIT = 10**7
 RYDBERG_CM = 109737.316 
 #preferred orbital order. you might need to change this for your preferred application.
-orbitals_order = ['1S', '2S', '2P', '3S', '3P', '4S', '3D', '4P', '4D', '5S', '5P', '6S', '4F', '5D', '6P', '7S', '5F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
+orbitals_order = ['1S', '2S', '2P', '3S', '3P', '4S', '3D', '4P', '4D', '5S', '4F', '5P', '6S', '5D', '6P', '7S', '5F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
 
 class energy_eigenstate:
 
@@ -247,10 +247,10 @@ def create_csf_array_from_output(grasp_out_path):
     num_nrcsf = int(pertinent_details[0])
     num_orbitals = int(pertinent_details[1])
     mode = int(pertinent_details[2])
-    if mode == 0:
-        print('-------------')
-        print('your GRASP printing is in mode 0 - pressing on but it is not likely your grasp.out contains the jj2ls data i want.')
-        print('-------------')
+    #if mode == 0:
+    #    print('-------------')
+    #    print('your GRASP printing is in mode 0 - pressing on but it is not likely your grasp.out contains the jj2ls data i want.')
+    #    print('-------------')
 
     orb_labels = []    
 

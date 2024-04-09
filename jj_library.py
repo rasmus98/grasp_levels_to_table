@@ -26,18 +26,21 @@ class eigenstate:
         for jj in range(0,len(ind)):
             if abs(coef[jj]) > EIGENVECTOR_CUT_OFF:
                 nr_csf_string_index = map[ind[jj]]
+                if jj != 0:
+                    string+= '+ '
                 csf_string = csf_prepared_nr[int(nr_csf_string_index)]
                 if debug:
                     csf_string += '(debug csf index: '+str(ind[jj]+1)+')'
                 coefficient = round(coef[jj],3)
 
                 if percent:
-                    coefficient_string = str(round(100 * coefficient**2,2))+'% '
+                    coefficient_string = '{:6.2f}'.format((100 * coefficient**2))+'%  '
                 else:
-                    coefficient_string = str(coefficient)
+                    coefficient_string = '{:5.3f}'.format(coefficient)
                 
                 string+= coefficient_string +  csf_string +' ' + jj_terms[ind[jj]]+ '  '
-        self.label_string = string
+                
+        self.label_string = string.lower()
 
         
 def locate_cfout_jj(graspoutpath):
@@ -84,13 +87,13 @@ def read_cfout_jj(graspoutpath,position,num_rcsf):
              current_line = grasp_out_read[pos+kk]
              if len(current_line.split()) > 0:
                  if current_line.split()[0] == 'CSF' or current_line.split()[0] == line_break_asterisk:
-                     print(kk)
+                     #print(kk)
                      break
         length_of_csf = kk 
         num_lines = int(length_of_csf/4)
         string = ''
         for jj in range(0,num_lines):
-            print((grasp_out_read[pos+(jj+1)*4 ]))
+            #print((grasp_out_read[pos+(jj+1)*4 ]))
             string += (grasp_out_read[pos+(jj+1)*4 ].replace('\n',''))
         #print('yes',string)
         jj_terms_csfs.append(string)
@@ -121,7 +124,8 @@ def decode_jj_terms(jj_term_csfs_array):
         j1 = split[-4].replace(';','').replace(')','')
         j2 = split[-2].replace(';','').replace(')','')
         #print(j1,j2)
-        string = '(' +str(j1)+','+str(j2)+')'
+        string = '( {:4}, {:4})'.format(j1,j2)
+        #string = '(' +str(j1)+','+str(j2)+')'
         jj_terms_final.append(string)
 
     return jj_terms_final
