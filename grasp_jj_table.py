@@ -17,6 +17,7 @@ if not args.file:
     print('no grasp out given. stopping')
 else:
 
+    print('NOTE THAT YOU NEED MCDF 32 AND NOT ANG 7 AS THIS SUPPRESSES THE JJCSFS')
 
     num_orbitals_shown = 2
     if args.num_orbitals:
