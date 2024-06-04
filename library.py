@@ -16,10 +16,13 @@ class energy_eigenstate:
         #print(current_state.eigenenergy)
         csf_string =''
         inner_terms = self.inner_terms_strings
+
         for kk in range(0,len(csf_mixing_coefficients)):
             current_csf_component_index = csf_mixing_states[kk]
 
-            current_nrcsf_index = rcsfs_map_to_nrcsfs[current_csf_component_index]
+            current_nrcsf_index = rcsfs_map_to_nrcsfs[0][current_csf_component_index]
+            #print(current_nrcsf_index)
+
             current_nrcsf_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
             
             if display_inner_terms and len(inner_terms) >0:
@@ -38,7 +41,7 @@ class energy_eigenstate:
         
 
         current_csf_component_index = self.mixing_indices[0]
-        current_nrcsf_index = rcsfs_map_to_nrcsfs[current_csf_component_index]
+        current_nrcsf_index = rcsfs_map_to_nrcsfs[0][current_csf_component_index]
 
 
         leading_term_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
