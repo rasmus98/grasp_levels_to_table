@@ -31,11 +31,11 @@ else:
             num_orbitals_shown = max(num_orbitals_shown,args.num_orbitals)
 
 
-        das_file_numpy,orbital_strings,num_csfs = read_das(args.das)
-        csf_strings = make_csf_strings(das_file_numpy,orbital_strings,num_csfs,num_orbitals_shown)
+        das_file_numpy,orbital_strings,num_csfs,lambda_array = read_das(args.das)
+        csf_strings,pseudo_array = make_csf_strings(das_file_numpy,orbital_strings,num_csfs,num_orbitals_shown,lambda_array)
 
         if args.terms:
-            read_terms_and_output(args.terms,csf_strings,user_num_levels)
+            read_terms_and_output(args.terms,csf_strings,user_num_levels,pseudo_array)
         if args.oic:
             states = read_oic_into_list_of_eigenstates(args.oic,csf_strings,user_num_levels)
             header = 'Index       Energy(Ry)     CSF(TERM)        J     LV'

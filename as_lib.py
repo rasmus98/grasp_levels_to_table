@@ -37,13 +37,30 @@ def read_das(path_to_das):
     if np.shape(das_file_numpy) == (total_num_orbs,):
         das_file_numpy = das_file_numpy.reshape((1,total_num_orbs))
 
-    #print(das_file_numpy[0])
+    lambda_array = np.zeros(total_num_orbs)
+    for jj in range(0,len(das_file_read)):
+        if das_file_read[jj].split()[0] == '&SMINIM':
+            print('lambda namelist found')
+            break 
+    #right now as assume includ and nvar = 0
+    lambda_collection = []
+    for ii in range(jj+1,len(das_file_read)):
+        if das_file_read[ii].split()[0] != '&SRADWIN':
+            lambda_collection.extend(das_file_read[ii].split())
+        else:
+            break
 
-    return das_file_numpy,orbital_strings,num_csfs
+    for ii in range(0, len(lambda_array)):
+        lambda_array[ii] = float(lambda_collection[ii])
 
-def make_csf_strings(das_file_numpy,orbital_strings,num_csfs,num_requested_orbitals):
+    print('Lambda array found:')
+    print(lambda_array)
+
+    return das_file_numpy,orbital_strings,num_csfs,lambda_array
+
+def make_csf_strings(das_file_numpy,orbital_strings,num_csfs,num_requested_orbitals,lambda_array):
     csf_strings = []
-
+    pseudo_array = []
     
 
     for jj in range(0, num_csfs):
@@ -52,35 +69,41 @@ def make_csf_strings(das_file_numpy,orbital_strings,num_csfs,num_requested_orbit
 
         #print(concerned_occupations_locations)
         concerned_occupations_numbers = current_csf_ints[concerned_occupations_locations]
-
+        concerned_lambdas = lambda_array[concerned_occupations_locations]
         concerned_occupations_orbitals = []
 
         for kk in range(0,len(concerned_occupations_locations)):
             concerned_occupations_orbitals.append(orbital_strings[concerned_occupations_locations[kk][0]])
 
+        pseudo = 0
+
+        if any(concerned_lambdas < 0.0):
+            pseudo = 1
+        pseudo_array.append(pseudo)
         
         num_orbitals = len(concerned_occupations_orbitals)
         current_csf_string = ''
 
         min = max(0,num_orbitals - num_requested_orbitals)
-
+        cf_format = '{:>3}{:3} '
         for kk in range(min,num_orbitals):
-            current_csf_string += concerned_occupations_orbitals[kk] + str(concerned_occupations_numbers[kk][0]) + " "
+            current_csf_string += cf_format.format(concerned_occupations_orbitals[kk], str(concerned_occupations_numbers[kk][0]))# + " "
         #print(current_csf_string)
 
         csf_strings.append(current_csf_string)
-    return csf_strings
+    return csf_strings,pseudo_array
 
-def read_terms_and_output(terms,csf_strings,num_levels):
+def read_terms_and_output(terms,csf_strings,num_levels,pseudo_array):
 
     terms_data = np.loadtxt(terms,skiprows=1) 
     #print(np.shape(terms_data))
     if num_levels > np.shape(terms_data)[0]:
         num_levels = np.shape(terms_data)[0]
 
-
+    header = 'index, level (ryd), config, psuedo indicator'
+    print(header)
             
-    output_string = '{:5},   {:10.6f},     {}'
+    output_string = '{:5},   {:10.6f},     {},     {:5},     {}'
 
 
     #print(num_levels)
@@ -103,7 +126,7 @@ def read_terms_and_output(terms,csf_strings,num_levels):
             print('failure in parity idenficiation at level',kk+1,'parity found',parity)
 
         term_string += ')'
-        print(output_string.format(kk+1,energy_ryd,csf_strings[cf_number] + term_string.upper()))
+        print(output_string.format(kk+1,energy_ryd,csf_strings[cf_number] + term_string.upper(),kk+1,pseudo_array[cf_number]))
 
 
 
