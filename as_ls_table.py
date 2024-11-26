@@ -38,7 +38,7 @@ else:
             read_terms_and_output(args.terms,csf_strings,user_num_levels,pseudo_array)
         if args.oic:
             states = read_oic_into_list_of_eigenstates(args.oic,csf_strings,user_num_levels)
-            header = 'Index       Energy(Ry)     CSF(TERM)        J     LV'
+            header = 'Index,       Energy(Ry),     CSF(TERM),        J,     LV'
             print(header)
             for state in states:
                 state.display_state()

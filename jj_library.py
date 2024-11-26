@@ -118,11 +118,12 @@ def decode_jj_terms(jj_term_csfs_array):
     for jj_terms in jj_term_csfs_array:
         split = jj_terms.split()
         #print(split)
-        if len(split) < 5:
-            print('failure in ',jj_terms)
-            sys.exit()
-        j1 = split[-4].replace(';','').replace(')','')
         j2 = split[-2].replace(';','').replace(')','')
+        
+        #if len(split) < 5:
+        #    print('failure in ',jj_terms)
+        #    sys.exit()
+        j1 = split[0].replace(';','').replace(')','')
         #print(j1,j2)
         string = '( {:4}, {:4})'.format(j1,j2)
         #string = '(' +str(j1)+','+str(j2)+')'

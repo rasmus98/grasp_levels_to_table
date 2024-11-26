@@ -23,7 +23,7 @@ def read_das(path_to_das):
         current_line = das_file_read[jj]
 
         if current_line.split()[0] == '&SMINIM':
-            print(jj-3,'csfs found')
+            #print(jj-3,'csfs found')
             break    
     
     num_csfs = jj - 3
@@ -31,7 +31,7 @@ def read_das(path_to_das):
     das_file_opened.close() 
 
     das_file_numpy = np.loadtxt(path_to_das,skiprows=3,max_rows=num_csfs,dtype=int)
-    print(np.shape(das_file_numpy))
+    #print(np.shape(das_file_numpy))
     
     #if there's only 1 csf, numpy breaks so just rehsape
     if np.shape(das_file_numpy) == (total_num_orbs,):
@@ -40,7 +40,7 @@ def read_das(path_to_das):
     lambda_array = np.zeros(total_num_orbs)
     for jj in range(0,len(das_file_read)):
         if das_file_read[jj].split()[0] == '&SMINIM':
-            print('lambda namelist found')
+            #print('lambda namelist found')
             break 
     #right now as assume includ and nvar = 0
     lambda_collection = []
@@ -53,8 +53,8 @@ def read_das(path_to_das):
     for ii in range(0, len(lambda_array)):
         lambda_array[ii] = float(lambda_collection[ii])
 
-    print('Lambda array found:')
-    print(lambda_array)
+    #print('Lambda array found:')
+    #print(lambda_array)
 
     return das_file_numpy,orbital_strings,num_csfs,lambda_array
 
@@ -192,7 +192,7 @@ def read_oic_and_output(oic,csf_strings,num_levels):
 
     #print(num_levels)
 
-    header = 'Index       Energy(Ry)     CSF(TERM)        J     LV'
+    header = 'Index,       Energy(Ry),     CSF(TERM),        J,     LV'
     print(header)
     for kk in range(0,num_levels):
         line = level_data[kk]
@@ -223,16 +223,23 @@ def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels):
     skip = len(csf_strings)
 
     x = linecache.getline(oic, 4).split()
-    print(x)
+    #print(x)
     #for each config, as outputs a hex code. this can somestimes extend to two lines
     #this detectst this.
     if len(x) == 1:
         skip *= 2
 
-
+    print(skip)
     x = linecache.getline(oic, skip + 6).split()
-    level_data = np.loadtxt(oic,skiprows=skip + 7,max_rows=int(x[1])) 
+    #print(x)
+    #evil hack, idk why it works this way. 
+    if len(x) >4:
+        skip = skip - 1
+        x = linecache.getline(oic, skip + 6).split()
+        #print(x)
 
+    level_data = np.loadtxt(oic,skiprows=skip + 7,max_rows=int(x[1])) 
+    #print(level_data)
     #print(np.shape(terms_data))
     if num_levels > np.shape(level_data)[0]:
         num_levels = np.shape(level_data)[0]
@@ -244,7 +251,7 @@ def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels):
 
     for kk in range(0,num_levels):
         line = level_data[kk]
-
+        #print(line)
         j = int(line[5]) / 2
         lv = int(line[1])
         multiplicity = line[3]
@@ -334,7 +341,7 @@ class energy_eigenstate_as_ic:
 
 
     def display_state(self):
-            output_string = '{:5},   {:12.8f},     {}  {}     {}'
+            output_string = '{:5},   {:12.8f},     {},  {},     {}'
 
             self.output_string = output_string.format(
             self.level_index,
@@ -357,7 +364,7 @@ def get_transitions(path,states):
             if line[1] == '1-DATA':
                 break 
     transitions = []
-    for jj in range(0,50):
+    for jj in range(0,145):
         line = f.readline().split()
         #todo: check if it runs over.
         #print(line) 

@@ -4,7 +4,9 @@ import sys
 LINE_READING_LIMIT = 10**7
 RYDBERG_CM = 109737.316 
 #preferred orbital order. you might need to change this for your preferred application.
-orbitals_order = ['1S', '2S', '2P', '3S', '3P', '4S', '3D', '4P', '4D', '5S', '4F', '5P', '6S', '5D', '6P', '7S', '5F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
+orbitals_order = ['1S', '2S', '2P', '3S', '3P', '3D', '4S', '4P', '4D', '5S', '5P', '4F', '6S', '5D', '6P', '7S', '5F', '6F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
+
+orbital_angular_momentum_dictionary = np.array(['S','P','D','F','G','H','I'])
 
 class energy_eigenstate:
 
@@ -16,7 +18,7 @@ class energy_eigenstate:
         #print(current_state.eigenenergy)
         csf_string =''
         inner_terms = self.inner_terms_strings
-
+        
         for kk in range(0,len(csf_mixing_coefficients)):
             current_csf_component_index = csf_mixing_states[kk]
 
@@ -36,6 +38,8 @@ class energy_eigenstate:
             if kk < len(csf_mixing_coefficients)-1:
                 csf_string +='+ ' 
             self.csf_string = csf_string 
+            #if kk  ==0 :
+            #    self.leading_term = current_nrcsf_string+current_terms[kk]
     
     def make_leading_term_string(self,csf_strings_prepared,rcsfs_map_to_nrcsfs):
         
@@ -45,14 +49,23 @@ class energy_eigenstate:
 
 
         leading_term_string = csf_strings_prepared[int(current_nrcsf_index)].lower()
+        self.leading_csf = leading_term_string
         leading_term_string += '('+self.terms_strings[0]
-
+        self.angular_momentum_orbital_string = self.terms_strings[0][-1]
+        indd = np.argwhere(orbital_angular_momentum_dictionary == self.angular_momentum_orbital_string)
+        self.angular_momentum_orbital_int = indd[0][0]
+        self.multiplicity = self.terms_strings[0][0:-1]
+        
+        #print(int(self.multiplicity),self.angular_momentum_orbital_int,self.angular_momentum_orbital_string)
         if self.parity == 'odd':
             leading_term_string += '*)' 
+            self.parity_character = 'o'
         else:
-            leading_term_string += ' )' 
+            leading_term_string += ' )'
+            self.parity_character = 'e' 
         leading_term_string += '_{'+self.angular_momentum+'}'
         self.leading_term_string = leading_term_string
+        self.leading_term_only_adas = '({:2})'.format(self.terms_strings[0])
 
 
 
@@ -80,6 +93,9 @@ class energy_eigenstate:
 
         self.shifted_energy_ryd = -1.0
         self.shifted_energy_cm= -1.0
+
+        #print(self.terms_strings[0])
+
 
         self.make_total_string(display_inner_terms,csf_strings_prepared,rcsfs_map_to_nrcsfs)
         self.make_leading_term_string(csf_strings_prepared,rcsfs_map_to_nrcsfs)
@@ -422,6 +438,67 @@ def make_csf_strings(num_orbitals_to_be_shown,csf_array_resorted_orbitals,sorted
 
 
     return csf_strings
+
+def make_csfs_strings_for_adas(csf_array_resorted_orbitals,sorted_orbital_strings,num_csfs):
+    csf_strings_adas = []
+    core = 7 
+    #need to make a find core routine..
+    orbital_format = '{:2}{}-'
+    orbital_format_last = '{:2}{}'
+    
+
+    for csf_index in range(0,len(csf_array_resorted_orbitals)):
+        string = ''
+        occupied_past=0
+        for ii in range(len(sorted_orbital_strings)-1,0,-1):
+            occ = csf_array_resorted_orbitals[csf_index][ii]
+            
+            if occ > 0:
+                occupied_past += 1
+                max_occ = np.max(csf_array_resorted_orbitals[:,ii])
+                if (max_occ >= 10) and occ < 10:
+                    orbital_format = '{:2}.{}'
+                    orbital_format_last = '{:2}.{}'
+                else:
+                    orbital_format = '{:2}{}'
+                    orbital_format_last = '{:2}{}'
+                
+                contribution = orbital_format.format(sorted_orbital_strings[ii].lower(),int(occ))
+                if occupied_past > 1:
+                    
+                    contribution+=''
+
+                if len(string+contribution) < 10:
+                    string = contribution + string
+                else:
+                    break
+        csf_strings_adas.append(string)
+
+    ##this is very ugly - but it works.
+    #for csf_index in range(0,len(csf_array_resorted_orbitals)):
+    #    string = ''
+    #    for ii in range(core+1,len(sorted_orbital_strings)):
+    #        occ = csf_array_resorted_orbitals[csf_index][ii]
+    #        if occ > 0:
+    #            max_occ = np.max(csf_array_resorted_orbitals[:,ii])
+    #            if (max_occ >= 10) and occ < 10:
+    #                orbital_format = '{:2}.{}-'
+    #                orbital_format_last = '{:2}.{}'
+    #            else:
+    #                orbital_format = '{:2}{}-'
+    #                orbital_format_last = '{:2}{}'
+
+    #            if any(csf_array_resorted_orbitals[csf_index][ii+1:]>0) :
+    #                string += orbital_format.format(sorted_orbital_strings[ii].lower(),int(occ))
+    #            else:
+    #                string += orbital_format_last.format(sorted_orbital_strings[ii].lower(),int(occ))
+
+    #    csf_strings_adas.append(string)
+    #    #print(string)
+
+
+
+    return csf_strings_adas
 
 def find_relativistic_csfs(grasp_out_path,num_csf):
     #reads graspout and finds relativistic csfs indicies.
