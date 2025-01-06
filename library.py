@@ -53,7 +53,10 @@ class energy_eigenstate:
         leading_term_string += '('+self.terms_strings[0]
         self.angular_momentum_orbital_string = self.terms_strings[0][-1]
         indd = np.argwhere(orbital_angular_momentum_dictionary == self.angular_momentum_orbital_string)
-        self.angular_momentum_orbital_int = indd[0][0]
+        if len(indd) > 0:
+            self.angular_momentum_orbital_int = indd[0][0]
+        else:
+            self.angular_momentum_orbital_int = self.angular_momentum_orbital_string
         self.multiplicity = self.terms_strings[0][0:-1]
         
         #print(int(self.multiplicity),self.angular_momentum_orbital_int,self.angular_momentum_orbital_string)
@@ -96,7 +99,7 @@ class energy_eigenstate:
 
         #print(self.terms_strings[0])
 
-
+        #print(level)
         self.make_total_string(display_inner_terms,csf_strings_prepared,rcsfs_map_to_nrcsfs)
         self.make_leading_term_string(csf_strings_prepared,rcsfs_map_to_nrcsfs)
 
@@ -231,8 +234,6 @@ def decode_condensed_notation(occupation_string_array,num_csfs):
             repeated_occupation_number = int(string[asterisk_index+1:])
             array[offset:offset+num_repeat] = repeated_occupation_number
             offset = offset + num_repeat
-
-
     return array 
 
 def create_csf_array_from_output(grasp_out_path):
@@ -512,13 +513,15 @@ def find_relativistic_csfs(grasp_out_path,num_csf):
     while (found == False):
         x = graspout.readline()
         split = x.split()
-
+        
         if len(split) > 0:
             if split[0] =='NR':
                 #print('yes')
                 #print(split)
 
                 found = True
+                print(split)
+
                 num_rcsfs_per_csf[int(split[2])-1] += int(split[4])
         if not x:
             print('ran off end of file. your GRASP.OUT probably doesnt contain the string (NR CSF) which is what im looking for')
@@ -530,7 +533,10 @@ def find_relativistic_csfs(grasp_out_path,num_csf):
         if len(split) == 0:
             found = False 
         else:
-            num_rcsfs_per_csf[int(split[2])-1] += int(split[4])
+            if split[0] !='NR':
+                found = False 
+            else:
+                num_rcsfs_per_csf[int(split[2])-1] += int(split[4])
 
     #print(num_rcsfs_per_csf)
 
