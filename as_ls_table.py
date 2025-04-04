@@ -7,6 +7,8 @@ parser.add_argument('-d', '--das',  help='Specify path of das')
 parser.add_argument('-t', '--terms',  help='Specify path of TERMS')
 parser.add_argument('-l', '--oic',  help='Specify path of oic')
 
+parser.add_argument('-v', '--eigenvector',  help='Print out eigenvector expansion',action='store_true')
+
 parser.add_argument('-n', '--num',  help='Requested number of states (all states by default)',type=int)
 parser.add_argument('-o', '--num_orbitals',  help='number of orbitals to show in NRCSF (2 default)',type=int)
 
@@ -34,13 +36,52 @@ else:
         das_file_numpy,orbital_strings,num_csfs,lambda_array = read_das(args.das)
         csf_strings,pseudo_array = make_csf_strings(das_file_numpy,orbital_strings,num_csfs,num_orbitals_shown,lambda_array)
 
+        if args.eigenvector:
+            print('eigenvector argument given')
+            g,gs = read_olg_for_groups()
+
+            vector_list,block_lv_map = read_olg_for_ci_matrix(g,gs)
+        
+        
         if args.terms:
             read_terms_and_output(args.terms,csf_strings,user_num_levels,pseudo_array)
         if args.oic:
             states = read_oic_into_list_of_eigenstates(args.oic,csf_strings,user_num_levels)
             header = 'Index,       Energy(Ry),     CSF(TERM),        J,     LV'
             print(header)
-            for state in states:
+            for (level_index,state) in enumerate(states):
                 state.display_state()
+                if args.eigenvector:
+                    lv_m1 = states[level_index].lv_number - 1
+                    block_index = block_lv_map[lv_m1]
+                    group = g[block_index]
+                    csfs_list = group[:,-2]
+                    #print()
+                    #print(csfs_list)
+                    #print(vector_list[lv_m1])
+                    orbLmap = ['S','P','D','F','G','H','I','K']
+                    formatee = '{:6.2f}%'
+                    arguments = np.argsort(abs(vector_list[lv_m1]))[::-1]
+                    print(17*' '+45*'*')
+                    print(17*' '+'Expansion:')
+
+                    for ii in range(0,3):
+                        vec_ind = arguments[ii]
+                        percent = abs(vector_list[lv_m1][vec_ind]) * vector_list[lv_m1][vec_ind]*100
+
+                        multiplicity = group[vec_ind,1]
+                        orbL = orbLmap[group[vec_ind,2]]
+                        term = '('+str(multiplicity)+orbL
+                        if(int(state.parity) ==1):
+                            term = term+'*'
+                        else:
+                            term = term+' '
+                        term = term + ')'
+                        string_print = '['+csf_strings[csfs_list[vec_ind]-1]+term+']'
+                        print(17*' ',formatee.format(percent)
+                              ,string_print
+                              )
+                    print(17*' '+45*'*')
+
 
 

@@ -26,7 +26,7 @@ def main(grasp_out_path,num_orbitals_shown,user_num_levels,display_inner_terms):
         inner_terms = find_inner_occupation_terms(grasp_out_path,mode,num_rcsf)
     else:
         inner_terms = []
-    print(inner_terms)
+    #print(inner_terms)
     states = find_levels(grasp_out_path,inner_terms,csf_strings_prepared,map)
     
     if display_inner_terms:

@@ -84,7 +84,7 @@ def make_csf_strings(das_file_numpy,orbital_strings,num_csfs,num_requested_orbit
         num_orbitals = len(concerned_occupations_orbitals)
         current_csf_string = ''
 
-        min = max(0,num_orbitals - num_requested_orbitals)
+        min = max(0,len(concerned_occupations_locations) - num_requested_orbitals)
         cf_format = '{:>3}{:3} '
         for kk in range(min,num_orbitals):
             current_csf_string += cf_format.format(concerned_occupations_orbitals[kk], str(concerned_occupations_numbers[kk][0]))# + " "
@@ -178,8 +178,13 @@ def read_levels_and_output(levels,csf_strings,num_levels):
 import linecache
 
 def read_oic_and_output(oic,csf_strings,num_levels):
-
-
+    #format string in as for oic output is
+    #10240 FORMAT(7I5,F15.6,I10)
+    #for this routine i modified it to: 
+    #10240 FORMAT(7(I5,1X),F15.6,I10)
+    #better solution is a fortran format read using the 
+    #fortranformat package.
+    
     x = linecache.getline(oic, len(csf_strings) + 6).split()
     level_data = np.loadtxt(oic,skiprows=len(csf_strings) + 7,max_rows=int(x[1])) 
 
@@ -352,10 +357,15 @@ class energy_eigenstate_as_ic:
         )
             print(self.output_string)
 
+limit = 3
+
 def get_transitions(path,states):
     f = open(path,'r')
     limit = 2**63-1
-
+    numStates = len(states)
+    avalues = np.zeros([numStates,numStates])
+    
+    
     #The formatting for OIC E1 data is: 10420, line 46400 is the call.
 
     for ii in range(limit):
@@ -364,34 +374,59 @@ def get_transitions(path,states):
             if line[1] == '1-DATA':
                 break 
     transitions = []
-    for jj in range(0,145):
+    runlimit = 1
+    add = False
+    for jj in range(0,limit):
         line = f.readline().split()
-        #todo: check if it runs over.
-        #print(line) 
+        if runlimit>=5:
+            break
 
-        upper_level = int(line[1])
-        lower_level = int(line[2])
-        a_value_len = float(line[3])
-        #print(a_value_len)
-        gf_len = float(line[5])
-        if '*' not in line[8]:
-            lambda_ang_vac = float(line[8])
+        if len(line) > 0:
+            #todo: check if it runs over.
+            #print(line) 
+
+            upper_level = int(line[1])
+            lower_level = int(line[2])
+            a_value_len = float(line[3])
+            
+            avalues[upper_level-1,lower_level-1] += abs(a_value_len)
+            avalues[lower_level-1,upper_level-1] += abs(a_value_len)
+
+            if (add):
+                avalues[upper_level-1,lower_level-1] += abs(float(line[4]))
+                avalues[lower_level-1,upper_level-1] += abs(float(line[4]))
+            #print(a_value_len)
+            gf_len = float(line[5])
+            if '*' not in line[8]:
+                lambda_ang_vac = float(line[8])
+            else:
+                lambda_ang_vac = np.inf
+
+            gf_vel = float(line[9])
+
+            transition = transition_as_ic(
+                upper_level,
+                lower_level,
+                a_value_len,
+                gf_len,
+                gf_vel,
+                lambda_ang_vac,
+                states
+            )
+            transitions.append(transition)
         else:
-            lambda_ang_vac = np.inf
-
-        gf_vel = float(line[9])
-
-        transition = transition_as_ic(
-            upper_level,
-            lower_level,
-            a_value_len,
-            gf_len,
-            gf_vel,
-            lambda_ang_vac,
-            states
-        )
-        transitions.append(transition)
-    return transitions
+            line = f.readline().split()
+            
+            print('breaking? ',line)
+    
+            runlimit = runlimit + 1
+            add = True 
+            #line = f.readline().split()
+        
+        
+        
+        
+    return transitions,avalues
 
 class transition_as_ic:
     def __init__(self,
@@ -504,3 +539,154 @@ def vac_to_air(wl_ang_vac):
         return wl_ang_vac / n
     else:
         return wl_ang_vac
+    
+    
+def read_olg_for_groups():
+    f = open('olg','r')
+    checker = True 
+    ii = 0
+    #find data
+    while checker: 
+        ii+=1 
+        line = f.readline().split()
+        if len(line) > 3: 
+            if line[-3] == 'LEVEL':
+                checker = False
+    print('jgroup data found at olg line',ii)
+    
+    done = False 
+    
+    current_group = []
+    groups = []
+    group_sizes = []
+    group_2j = []
+    num_levels = 0
+    num_blanks = 0
+    num_in_this_group = 0
+    while not done:
+        line = f.readline().split()
+        #we are in a block
+        if   len(line) == 6:
+            if (line[0]!= 'LV'):
+                num_blanks = 0
+                #print(line)
+                current_group.append(line)
+                num_levels = num_levels+1
+                num_in_this_group+= 1
+ 
+        
+        #end of a group
+        elif len(line) == 7 or len(line) == 8:
+            #print(line)
+            #print(current_group[0])
+            data = np.array(current_group,dtype=int)
+            #print(data)
+            groups.append(data)
+            group_sizes.append(num_in_this_group)
+            current_group = [] 
+            num_in_this_group = 0
+
+            
+        elif len(line) == 0:
+            num_blanks +=1 
+        if num_blanks == 3:
+            done = True
+    #print(groups[0][0,1])
+    f.close()
+    print('total levels = ',num_levels)
+    print('jpi block sizes are',group_sizes)
+    return groups,group_sizes
+
+
+
+    
+
+
+
+def read_olg_for_ci_matrix(groups,group_sizes):
+    f = open('olg','r')
+    def read_eigenvector(blocksize,line):
+        #blocksize = 41
+        vector = np.zeros(blocksize)
+        veciter = 0
+        vector_isolated = line[10:]
+        #print(line[10:])
+        limit = 6 
+        for ii in range(0,min(len(vector_isolated),blocksize)):
+            veciter+=1 
+            if line[ii][0] == '-':
+                limit = 8 
+            else:
+                limit = 7
+            vector[ii] = float(vector_isolated[ii][0:limit])
+        #print(vector,veciter)
+
+        while (veciter < blocksize):
+            line = f.readline().split()
+            for ii in range(0,len(line)):
+                if veciter>=blocksize:
+                    break
+                #print(line[ii])
+                if line[ii][0] == '-':
+                    limit = 7 
+                else:
+                    limit = 6
+                if ((veciter == blocksize-1) and len(line[ii] )>limit ):
+                    vector[veciter] = float(line[ii][0:limit])
+                else:
+                    vector[veciter] = line[ii]
+                veciter+=1 
+                #print(veciter,blocksize)
+
+
+            #print(vector,veciter)
+        norm = np.dot(vector,vector)
+        if (abs(norm-1.0) >1e-3):
+            print('potential norm problem')
+        return vector
+
+    checker = True 
+    ii=0
+    while checker: 
+        ii+=1 
+        line = f.readline().split()
+        if len(line) > 9: 
+            if line[9] == 'CI-MATRIX':
+                checker = False 
+                #print(ii)
+                
+    level_counter = 0
+    
+    strings_in_current_vector = []
+    
+    num_blocks = len(groups)
+    num_levels = sum(group_sizes)
+    block_lv_map = np.zeros(num_levels,dtype=int)
+
+    requested_level = 0
+    vector_list = []
+    for jj in range(0,num_blocks):
+        blocksize = group_sizes[jj]
+        #print('new block',blocksize)
+        for kk in range(0,blocksize):
+        
+            checker = True 
+            #print(ii)
+            block_lv_map[requested_level] = int(jj)
+            requested_level +=1
+            #print(requested_level)
+
+            while checker:
+                line = f.readline().split()
+                if len(line) > 1:
+                    if float(line[0]) == requested_level:
+                        #we are in the correct level
+                        checker = False
+            #print('reading level',requested_level,'block size = ',blocksize)
+            vector = read_eigenvector(blocksize,line)
+            vector_list.append(vector)
+
+    f.close()
+    
+
+    return vector_list,block_lv_map

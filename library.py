@@ -4,7 +4,7 @@ import sys
 LINE_READING_LIMIT = 10**7
 RYDBERG_CM = 109737.316 
 #preferred orbital order. you might need to change this for your preferred application.
-orbitals_order = ['1S', '2S', '2P', '3S', '3P', '3D', '4S', '4P', '4D', '5S', '5P', '4F', '6S', '5D', '6P', '7S', '5F', '6F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
+orbitals_order = ['1S', '2S', '2P', '3S', '3P', '3D', '4S', '4P', '4D','4F', '5S', '5P','5D', '6S', '6P', '7S', '5F', '6F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
 
 orbital_angular_momentum_dictionary = np.array(['S','P','D','F','G','H','I'])
 
@@ -520,7 +520,7 @@ def find_relativistic_csfs(grasp_out_path,num_csf):
                 #print(split)
 
                 found = True
-                print(split)
+                #print(split)
 
                 num_rcsfs_per_csf[int(split[2])-1] += int(split[4])
         if not x:
