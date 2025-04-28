@@ -65,8 +65,8 @@ else:
                     print(17*' '+45*'*')
                     print(17*' '+'Expansion:')
 
-                    for ii in range(0,3):
-                        vec_ind = arguments[ii]
+                    for ii in range(0,6):
+                        vec_ind = arguments[min(ii,len(arguments)-1)]
                         percent = abs(vector_list[lv_m1][vec_ind]) * vector_list[lv_m1][vec_ind]*100
 
                         multiplicity = group[vec_ind,1]
