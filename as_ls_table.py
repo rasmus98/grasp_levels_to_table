@@ -65,7 +65,7 @@ else:
                     print(17*' '+45*'*')
                     print(17*' '+'Expansion:')
 
-                    for ii in range(0,3):
+                    for ii in range(0,min(6,len(arguments)-1)):
                         vec_ind = arguments[ii]
                         percent = abs(vector_list[lv_m1][vec_ind]) * vector_list[lv_m1][vec_ind]*100
 
