@@ -1,6 +1,6 @@
 import numpy as np 
 
-ANGULAR_SYMBOLS = ['s','p','d','f','g','h','i']
+ANGULAR_SYMBOLS = ['s','p','d','f','g','h','i','k','l','m','o','p']
 
 def read_das(path_to_das):
 
@@ -42,14 +42,20 @@ def read_das(path_to_das):
         if das_file_read[jj].split()[0] == '&SMINIM':
             #print('lambda namelist found')
             break 
+        
+    #need to make this a bit better
+    
     #right now as assume includ and nvar = 0
     lambda_collection = []
     for ii in range(jj+1,len(das_file_read)):
-        if das_file_read[ii].split()[0] != '&SRADWIN':
-            lambda_collection.extend(das_file_read[ii].split())
+        if len(das_file_read[ii].split()[0])==0:
+            print('skipping lambdas - couldnt find them')
         else:
-            break
-
+            if das_file_read[ii].split()[0] != '&SRADWIN':
+                lambda_collection.extend(das_file_read[ii].split())
+            else:
+                break
+            
     for ii in range(0, len(lambda_array)):
         lambda_array[ii] = float(lambda_collection[ii])
 
@@ -177,7 +183,7 @@ def read_levels_and_output(levels,csf_strings,num_levels):
 
 import linecache
 
-def read_oic_and_output(oic,csf_strings,num_levels):
+def read_oic_and_output(oic,csf_strings,num_levels,unit):
     #format string in as for oic output is
     #10240 FORMAT(7I5,F15.6,I10)
     #for this routine i modified it to: 
@@ -223,7 +229,7 @@ def read_oic_and_output(oic,csf_strings,num_levels):
 
     return 0
 
-def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels):
+def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels,factor,unit):
 
     skip = len(csf_strings)
 
@@ -234,7 +240,7 @@ def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels):
     if len(x) == 1:
         skip *= 2
 
-    print(skip)
+    print('skip=',skip)
     x = linecache.getline(oic, skip + 6).split()
     #print(x)
     #evil hack, idk why it works this way. 
@@ -253,16 +259,25 @@ def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels):
     #print(header)
 
     states = []
-
+    fracJ = False
     for kk in range(0,num_levels):
         line = level_data[kk]
         #print(line)
+        if int(line[5]) % 2 ==1:
+            fracJ = True
+            
         j = int(line[5]) / 2
+        #j ="1/2"
+        if fracJ:
+            j_string = str(int(line[5]))+'/2'
+        else:
+            j_string = str(j)
+        
         lv = int(line[1])
         multiplicity = line[3]
         angular = line[4]
         cf_number = int(line[6]-1)
-        energy_ryd = line[-1]
+        energy_ryd = line[-1]*factor
 
         parity = 0
         if multiplicity < 0:
@@ -277,7 +292,10 @@ def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels):
             parity,
             cf_number,
             csf_strings,
-            lv
+            lv,
+            unit,
+            factor,
+            j_string
         )
         states.append(state)
 
@@ -297,7 +315,7 @@ def read_oic_into_list_of_eigenstates(oic,csf_strings,num_levels):
     return states
 
 def translate_angular(angular_number):
-    if angular_number < 7:
+    if angular_number < len(ANGULAR_SYMBOLS):
         return ANGULAR_SYMBOLS[angular_number]
     else:
         return str(angular_number)
@@ -316,7 +334,10 @@ class energy_eigenstate_as_ic:
                  parity,
                  cf_number,
                  csf_strings,
-                 lv_number
+                 lv_number,
+                 unit,
+                 factor,
+                 j_string
                  ):
 
         self.energy_ryd         = energy_ryd
@@ -329,6 +350,16 @@ class energy_eigenstate_as_ic:
         self.level_index        = level_index
         self.lv_number = lv_number
         self.stat_weight = 2.0 * angular_momentum_j + 1.0
+        self.j_string = j_string
+        
+        #output stuff
+        self.output_string = '{:5},'
+        if(unit==2):
+            self.output_string+= '{:12.3f}'
+        else:
+            self.output_string+= '{:12.8f}'    
+        self.output_string += ',     {},  {:>4},     {}'
+        
         
         term_string = '('+str(int(angular_momentum_S)) + translate_angular(int(angular_momentum_L))
 
@@ -346,13 +377,12 @@ class energy_eigenstate_as_ic:
 
 
     def display_state(self):
-            output_string = '{:5},   {:12.8f},     {},  {},     {}'
 
-            self.output_string = output_string.format(
+            self.output_string = self.output_string.format(
             self.level_index,
             self.energy_ryd,
             self.label_string,
-            self.angular_momentum_j,
+            self.j_string,
             self.lv_number
         )
             print(self.output_string)
@@ -618,7 +648,8 @@ def read_olg_for_ci_matrix(groups,group_sizes):
                 limit = 8 
             else:
                 limit = 7
-            vector[ii] = float(vector_isolated[ii][0:limit])
+            #vector[ii]
+            vector[ii] = float(vector_isolated[ii][0:limit].replace("*",""))
         #print(vector,veciter)
 
         while (veciter < blocksize):
