@@ -5,8 +5,21 @@ LINE_READING_LIMIT = 10**7
 RYDBERG_CM = 109737.316 
 #preferred orbital order. you might need to change this for your preferred application.
 orbitals_order = ['1S', '2S', '2P', '3S', '3P', '3D', '4S', '4P', '4D','4F', '5S', '5P','5D', '6S', '6P', '7S', '5F', '6F', '6D', '7P', '8S','5G','6G','6H','8P','7D']
+def generate_hunds_orbitals(max_n):
+    ang_letters = "SPDFGHIKLMNOQRTUVWXYZ"
+    orbitals = []
+    for n in range(1, max_n + 1):
+        for l in range(n):
+            if l < len(ang_letters):
+                orbital = f"{n}{ang_letters[l]}"
+                orbitals.append(orbital)
+            else:
+                break
+    # Sort orbitals by n and l
+    return sorted(orbitals, key=lambda x: int(x[:-1])+ ang_letters.index(x[-1]))
+orbitals_order = generate_hunds_orbitals(20)  # Example usage, generates orbitals for 10 electrons
 
-orbital_angular_momentum_dictionary = np.array(['S','P','D','F','G','H','I'])
+orbital_angular_momentum_dictionary =  "SPDFGHIKLMNOQRTUVWXYZ"
 
 class energy_eigenstate:
 
@@ -52,11 +65,7 @@ class energy_eigenstate:
         self.leading_csf = leading_term_string
         leading_term_string += '('+self.terms_strings[0]
         self.angular_momentum_orbital_string = self.terms_strings[0][-1]
-        indd = np.argwhere(orbital_angular_momentum_dictionary == self.angular_momentum_orbital_string)
-        if len(indd) > 0:
-            self.angular_momentum_orbital_int = indd[0][0]
-        else:
-            self.angular_momentum_orbital_int = self.angular_momentum_orbital_string
+        self.angular_momentum_orbital_int = orbital_angular_momentum_dictionary.index(self.angular_momentum_orbital_string)
         self.multiplicity = self.terms_strings[0][0:-1]
         
         #print(int(self.multiplicity),self.angular_momentum_orbital_int,self.angular_momentum_orbital_string)
@@ -64,7 +73,7 @@ class energy_eigenstate:
             leading_term_string += '*)' 
             self.parity_character = 'o'
         else:
-            leading_term_string += ' )'
+            leading_term_string += ')'
             self.parity_character = 'e' 
         leading_term_string += '_{'+self.angular_momentum+'}'
         self.leading_term_string = leading_term_string
@@ -360,21 +369,21 @@ def create_csf_array_from_input(grasp_inp_path):
 
 
 
-def sort_orbitals(orb_labels,orbitals_order,csf_array):
+def sort_orbitals(orb_labels,csf_array):
     new_order = np.zeros(len(orb_labels))
     #this is a naive search but the number of orbitals should be small enough for it to not matter
 
     scores = []
 
-    for jj in range(0,len(orb_labels)):
+    for orb_label in orb_labels:
         found = False 
         for ii in range(0,len(orbitals_order)):
-            if orbitals_order[ii] == orb_labels[jj]:
+            if orbitals_order[ii] == orb_label:
                 found = True 
                 #print(ii,jj)
                 scores.append(ii)
         if found == False:
-            print('orbital not found',orb_labels[jj])
+            print('orbital not found',orb_label)
             assert(1==0),'orbital not found, not implemented. stopping. add your orbital to the orbitals order global variable'
         
     new_order = np.argsort(scores)
@@ -418,7 +427,8 @@ def make_csf_strings(num_orbitals_to_be_shown,csf_array_resorted_orbitals,sorted
         csf_string_broken_down = []
         #the max business is in case all orbitals are requested -- this could go negative, and cause me a headache.
         for kk in range(max(num_occupations_of_interest - num_orbitals_to_be_shown,0),num_occupations_of_interest):
-            addition = kept_orbital_strings[kk] + str(int(occupations_of_interest[kk]))
+            occupation = int(occupations_of_interest[kk])
+            addition = kept_orbital_strings[kk] + (str(occupation) if occupation > 1 else "")
             lengths.append(len(addition))
             csf_string_broken_down.append(addition)
 
@@ -429,11 +439,14 @@ def make_csf_strings(num_orbitals_to_be_shown,csf_array_resorted_orbitals,sorted
     
     max_length = max(lengths)
 
+    for csf in csf_strings_in_components:
+        csf_strings.append(".".join(csf) + " ")
+        
     for jj in range(0,len(csf_strings_in_components)):
         current_string = ''
         for kk in csf_strings_in_components[jj]:
             current_string += kk + (max_length-len(kk))*' ' + ' '
-        csf_strings.append(current_string)
+        #csf_strings.append(current_string)
         #length_of_this = len(csf_strings[jj])
         #csf_strings[jj] = csf_strings[jj] + (max_length-length_of_this)*' '
 
@@ -876,7 +889,7 @@ def print_out_a_values(total_data_class_array:list[transition]):
             ,'λ (air,nm)'
             ,'A (s-1)','gA (s-1)'
             ,'f ','gf','log(gf)'
-            ,'vel\len'
+            ,r'vel\len'
             ,'LowDesignation','UppDesignation'
     ))
     for trans in total_data_class_array:

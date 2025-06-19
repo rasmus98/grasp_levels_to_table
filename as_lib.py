@@ -547,7 +547,7 @@ def print_out_a_values(total_data_class_array:list[transition_as_ic]):
             ,'λ (air,nm)'
             ,'A (s-1)','gA (s-1)'
             ,'f ','gf','log(gf)'
-            ,'vel\len'
+            ,'vel\\len'
             ,'LowDesignation','UppDesignation'
     ))
     for trans in total_data_class_array:
